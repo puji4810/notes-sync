@@ -1,10 +1,13 @@
 package puji.p2p_notes_sync.controller;
 
 import puji.p2p_notes_sync.config.RepositoryConfig;
+import puji.p2p_notes_sync.p2p.P2PCoordinatorService;
 import puji.p2p_notes_sync.service.ConfigService;
 import puji.p2p_notes_sync.service.GitService;
 import puji.p2p_notes_sync.service.MkDocsService;
 import puji.p2p_notes_sync.util.ResponseEntityUtil; // 您创建的工具类
+
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -32,12 +35,15 @@ public class RepositoryController {
 	private final ConfigService configService;
 	private final GitService gitService;
 	private final MkDocsService mkDocsService;
+	private final P2PCoordinatorService p2pCoordinatorService; // P2P服务
 
 	@Autowired
-	public RepositoryController(ConfigService configService, GitService gitService, MkDocsService mkDocsService) {
+	public RepositoryController(ConfigService configService, GitService gitService, MkDocsService mkDocsService,
+			P2PCoordinatorService p2pCoordinatorService) {
 		this.configService = configService;
 		this.gitService = gitService;
 		this.mkDocsService = mkDocsService;
+		this.p2pCoordinatorService = p2pCoordinatorService;
 	}
 
 	@Operation(summary = "获取所有已配置的笔记仓库列表", description = "返回一个包含所有已注册笔记仓库配置的列表。")
@@ -63,6 +69,8 @@ public class RepositoryController {
 		return Mono.fromCallable(() -> {
 			boolean success = configService.addRepositoryConfig(newRepoConfig);
 			if (success) {
+				// 广播新仓库配置到其他节点
+				p2pCoordinatorService.broadcastNewRepositoryConfiguration(newRepoConfig);
 				return ResponseEntity.status(HttpStatus.CREATED).body(newRepoConfig);
 			} else {
 				return ResponseEntityUtil.<RepositoryConfig>badRequest();
@@ -96,6 +104,8 @@ public class RepositoryController {
 		return Mono.fromCallable(() -> {
 			boolean success = configService.updateRepositoryConfig(repoAlias, updatedRepoConfig);
 			if (success) {
+				// 更新成功后，广播更新配置到其他节点
+				p2pCoordinatorService.broadcastNewRepositoryConfiguration(updatedRepoConfig);
 				return ResponseEntity.ok(updatedRepoConfig);
 			} else {
 				// 根据updateRepositoryConfig的内部逻辑，失败可能是404或400
@@ -118,7 +128,14 @@ public class RepositoryController {
 	@DeleteMapping("/{repoAlias}")
 	public Mono<ResponseEntity<Void>> removeRepository(
 			@Parameter(description = "要删除的仓库别名", required = true, example = "obsolete-notes") @PathVariable String repoAlias) {
-		return Mono.fromCallable(() -> configService.removeRepositoryConfig(repoAlias))
+		return Mono.fromCallable(() -> {
+			boolean success = configService.removeRepositoryConfig(repoAlias);
+			if (success) {
+				// 删除成功后，广播删除配置到其他节点
+				p2pCoordinatorService.broadcastRemovedRepositoryConfiguration(repoAlias);
+			}
+			return success;
+		})
 				.subscribeOn(Schedulers.boundedElastic())
 				.flatMap(success -> success
 						? Mono.just(ResponseEntity.noContent().<Void>build())
@@ -133,9 +150,16 @@ public class RepositoryController {
 	@PostMapping("/{repoAlias}/sync")
 	public Mono<ResponseEntity<String>> syncRepository(
 			@Parameter(description = "要同步的仓库别名", required = true, example = "my-work-notes") @PathVariable String repoAlias) {
-		// ... (方法体与之前类似，主要是注解的添加) ...
 		return Mono.justOrEmpty(configService.getRepositoryConfigByAlias(repoAlias))
-				.flatMap(config -> Mono.fromCallable(() -> gitService.pullRepository(config))
+				.flatMap(config -> Mono.fromCallable(() -> {
+					String localSyncResult = gitService.pullRepository(config); // 或其他同步方法
+					// 本地同步后，广播P2P同步请求
+					if (localSyncResult.toLowerCase().contains("successful")
+							|| !localSyncResult.toLowerCase().contains("fail")) { // 简单判断成功
+						p2pCoordinatorService.broadcastSyncRequest(config.alias()); // 使用别名或URL
+					}
+					return localSyncResult;
+				})
 						.subscribeOn(Schedulers.boundedElastic())
 						.map(resultMessage -> ResponseEntity.ok(resultMessage)))
 				.defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -163,6 +187,41 @@ public class RepositoryController {
 							.subscribeOn(Schedulers.boundedElastic())
 							.map(resultMessage -> ResponseEntity.ok(resultMessage));
 				})
+				.defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND)
+						.body("Repository with alias '" + repoAlias + "' not found."));
+	}
+
+	@Operation(summary = "提交并推送指定仓库的本地更改", description = "将本地所有未提交的更改添加到暂存区，使用提供的消息进行提交，然后将提交推送到远程仓库。")
+	@ApiResponses(value = {
+			@ApiResponse(responseCode = "200", description = "提交和推送操作成功执行，返回Git操作的输出信息", content = @Content(mediaType = "text/plain")),
+			@ApiResponse(responseCode = "400", description = "请求体无效（例如缺少提交信息）", content = @Content(mediaType = "text/plain")),
+			@ApiResponse(responseCode = "404", description = "未找到具有指定别名的仓库", content = @Content(mediaType = "text/plain")),
+			@ApiResponse(responseCode = "500", description = "Git操作过程中发生错误", content = @Content(mediaType = "text/plain"))
+	})
+	@PostMapping("/{repoAlias}/commit-push")
+	public Mono<ResponseEntity<String>> commitAndPushRepository(
+			@Parameter(description = "要操作的仓库别名", required = true, example = "my-work-notes") @PathVariable String repoAlias,
+			@RequestBody(description = "包含提交信息的请求体。例如：{\"commitMessage\": \"My daily updates\", \"authorName\": \"Puji\", \"authorEmail\": \"puji@example.com\"} (authorName 和 authorEmail 可选)", required = true, content = @Content(schema = @Schema(type = "object", example = "{\"commitMessage\": \"My daily updates\", \"authorName\": \"Optional Author Name\", \"authorEmail\": \"optional@example.com\"}"))) @org.springframework.web.bind.annotation.RequestBody Map<String, String> payload) { // 使用Map接收简单JSON
+
+		String commitMessage = payload.get("commitMessage");
+		if (commitMessage == null || commitMessage.isBlank()) {
+			return Mono.just(ResponseEntity.badRequest().body("Commit message is required."));
+		}
+		// authorName 和 authorEmail 是可选的
+		String authorName = payload.get("authorName");
+		String authorEmail = payload.get("authorEmail");
+
+		return Mono.justOrEmpty(configService.getRepositoryConfigByAlias(repoAlias))
+				.flatMap(config -> Mono
+						.fromCallable(() -> gitService.addCommitAndPush(config, commitMessage, authorName, authorEmail))
+						.subscribeOn(Schedulers.boundedElastic())
+						.map(resultMessage -> {
+							if (resultMessage.startsWith("JGit API exception")
+									|| resultMessage.startsWith("JGit: Error with repository operation")) {
+								return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(resultMessage);
+							}
+							return ResponseEntity.ok(resultMessage);
+						}))
 				.defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND)
 						.body("Repository with alias '" + repoAlias + "' not found."));
 	}
