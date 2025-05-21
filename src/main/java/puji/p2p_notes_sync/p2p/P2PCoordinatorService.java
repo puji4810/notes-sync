@@ -57,6 +57,29 @@ public class P2PCoordinatorService {
 	}
 
 	/**
+	 * 当本地更新一个仓库配置时，向其他节点广播此信息。
+	 * 
+	 * @param oldRepoAlias      更新前的仓库别名
+	 * @param updatedRepoConfig 更新后的仓库配置 (不应包含token)
+	 */
+	public void broadcastUpdateRepositoryConfiguration(String oldRepoAlias, RepositoryConfig updatedRepoConfig) {
+		if (updatedRepoConfig == null)
+			return;
+
+		logger.info("P2P: Broadcasting UPDATE for repository config: {} (old alias: {})",
+				updatedRepoConfig.alias(), oldRepoAlias);
+
+		// 使用新的构造函数，包含旧别名
+		RepoConfigP2PNotification notification = new RepoConfigP2PNotification(
+				RepoConfigP2PNotification.Action.UPDATE,
+				oldRepoAlias, // 旧别名
+				updatedRepoConfig.alias(), // 新别名
+				updatedRepoConfig.gitUrl() // 确保不发送token
+		);
+		p2pWebSocketHandler.broadcastMessage(notification);
+	}
+
+	/**
 	 * 当本地发起同步操作后，向其他节点请求对同一仓库进行同步。
 	 * 
 	 * @param repoUrlOrAlias 要同步的仓库URL或别名

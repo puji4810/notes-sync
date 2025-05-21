@@ -105,7 +105,7 @@ public class RepositoryController {
 			boolean success = configService.updateRepositoryConfig(repoAlias, updatedRepoConfig);
 			if (success) {
 				// 更新成功后，广播更新配置到其他节点
-				p2pCoordinatorService.broadcastNewRepositoryConfiguration(updatedRepoConfig);
+				p2pCoordinatorService.broadcastUpdateRepositoryConfiguration(repoAlias, updatedRepoConfig);
 				return ResponseEntity.ok(updatedRepoConfig);
 			} else {
 				// 根据updateRepositoryConfig的内部逻辑，失败可能是404或400
@@ -156,7 +156,8 @@ public class RepositoryController {
 					// 本地同步后，广播P2P同步请求
 					if (localSyncResult.toLowerCase().contains("successful")
 							|| !localSyncResult.toLowerCase().contains("fail")) { // 简单判断成功
-						p2pCoordinatorService.broadcastSyncRequest(config.alias()); // 使用别名或URL
+						// p2pCoordinatorService.broadcastSyncRequest(config.alias()); // 使用别名或URL
+						// 这里认为不需要同步，每个用户的别名是可以不同的
 					}
 					return localSyncResult;
 				})
