@@ -1,6 +1,6 @@
-package puji.p2p_notes_sync.service;
+package puji.p2p_notes_sync.service.config;
 
-import puji.p2p_notes_sync.config.RepositoryConfig;
+import puji.p2p_notes_sync.model.config.RepositoryConfig;
 // import puji.p2p_notes_sync.p2p.P2PCoordinatorService; // service层同级，应该放到controller进行
 
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -36,7 +36,7 @@ public class ConfigService {
 	public ConfigService() {
 		this.objectMapper = new ObjectMapper();
 		this.objectMapper.enable(SerializationFeature.INDENT_OUTPUT);
-
+		this.objectMapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
 		Path projectRoot = Paths.get("").toAbsolutePath();
 		this.configFilePath = projectRoot.resolve(CONFIG_DIR).resolve(CONFIG_FILE_NAME);
 
@@ -80,11 +80,12 @@ public class ConfigService {
 			// 确保父目录存在
 			Files.createDirectories(configFilePath.getParent());
 
-			// 写入空JSON数组
-			objectMapper.writeValue(configFilePath.toFile(), new ArrayList<>());
-			logger.info("Created empty configuration file with [] at {}", configFilePath);
+			// 写入包含默认配置的JSON数组
+			objectMapper.writeValue(configFilePath.toFile(),
+					new ArrayList<>(List.of(RepositoryConfig.defaultConfig())));
+			logger.info("Created configuration file with default config at {}", configFilePath);
 		} catch (IOException e) {
-			logger.error("Failed to create empty configuration file at {}: {}", configFilePath, e.getMessage(), e);
+			logger.error("Failed to create configuration file at {}: {}", configFilePath, e.getMessage(), e);
 		}
 	}
 
@@ -118,7 +119,8 @@ public class ConfigService {
 		}
 		repositoryConfigs.add(newRepoConfig);
 		saveConfigs();
-		// p2pCoordinatorService.broadcastNewRepositoryConfiguration(newRepoConfig); // 广播新配置
+		// p2pCoordinatorService.broadcastNewRepositoryConfiguration(newRepoConfig); //
+		// 广播新配置
 		// 这里可以选择是否立即同步新添加的仓库
 		// p2pCoordinatorService.broadcastSyncRequest(newRepoConfig.gitUrl());
 		logger.info("Repository '{}' added.", newRepoConfig.alias());
@@ -130,7 +132,8 @@ public class ConfigService {
 		if (removed) {
 			saveConfigs();
 			logger.info("Repository '{}' removed.", alias);
-			// p2pCoordinatorService.broadcastRemovedRepositoryConfiguration(alias); // 广播删除配置
+			// p2pCoordinatorService.broadcastRemovedRepositoryConfiguration(alias); //
+			// 广播删除配置
 			// 这里可以选择是否立即同步删除的仓库
 			// p2pCoordinatorService.broadcastSyncRequest(alias);
 			// 并且直接删除本地文件
@@ -138,7 +141,8 @@ public class ConfigService {
 			// if (repoDir.exists()) {
 			// repoDir.delete();
 			// }
-			// logger.info("Local repository directory deleted: {}", repoDir.getAbsolutePath());
+			// logger.info("Local repository directory deleted: {}",
+			// repoDir.getAbsolutePath());
 		} else {
 			logger.warn("Repository with alias '{}' not found. Cannot remove.", alias);
 		}
@@ -160,7 +164,8 @@ public class ConfigService {
 			if (repositoryConfigs.get(i).alias().equalsIgnoreCase(alias)) {
 				repositoryConfigs.set(i, updatedRepoConfig);
 				saveConfigs();
-				// p2pCoordinatorService.broadcastNewRepositoryConfiguration(updatedRepoConfig); // 广播更新配置
+				// p2pCoordinatorService.broadcastNewRepositoryConfiguration(updatedRepoConfig);
+				// // 广播更新配置
 				// 这里可以选择是否立即同步更新的仓库
 				// p2pCoordinatorService.broadcastSyncRequest(updatedRepoConfig.gitUrl());
 				logger.info("Repository '{}' updated.", alias);

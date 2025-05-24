@@ -9,5 +9,4 @@ public class P2pNotesSyncApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(P2pNotesSyncApplication.class, args);
 	}
-
 }

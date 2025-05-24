@@ -1,4 +1,4 @@
-package puji.p2p_notes_sync.p2p;
+package puji.p2p_notes_sync.p2p.websocket;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,14 +11,19 @@ import org.springframework.web.reactive.socket.WebSocketMessage;
 import org.springframework.web.reactive.socket.WebSocketSession;
 import org.springframework.web.reactive.socket.client.ReactorNettyWebSocketClient;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers; // 导入 Schedulers
+import reactor.core.scheduler.Schedulers;
 
-import puji.p2p_notes_sync.config.RepositoryConfig;
+import puji.p2p_notes_sync.model.config.RepositoryConfig;
+import puji.p2p_notes_sync.model.config.SyncConfig;
 import puji.p2p_notes_sync.p2p.dto.P2PMessage;
 import puji.p2p_notes_sync.p2p.dto.RepoConfigP2PNotification;
 import puji.p2p_notes_sync.p2p.dto.RepoSyncP2PRequest;
-import puji.p2p_notes_sync.service.ConfigService;
-import puji.p2p_notes_sync.service.GitService;
+import puji.p2p_notes_sync.service.config.ConfigService;
+import puji.p2p_notes_sync.service.git.GitService;
+import puji.p2p_notes_sync.model.sync.SyncStrategy;
+import puji.p2p_notes_sync.model.sync.ConflictResolution;
+import puji.p2p_notes_sync.p2p.coordinator.P2PCoordinatorService;
+import puji.p2p_notes_sync.p2p.discovery.MDNSService;
 
 import java.net.URI;
 import java.util.Map;
@@ -115,13 +120,15 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 	private void handleConfigNotification(RepoConfigP2PNotification notification) {
 		String alias = notification.getRepoAlias();
 		if (notification.getAction() == RepoConfigP2PNotification.Action.ADD) {
-			// Check if the same configuration already exists locally to avoid duplicate
-			// additions or conflicts
 			if (configService.getRepositoryConfigByAlias(alias).isEmpty()) {
-				RepositoryConfig newConfig = new RepositoryConfig(alias, notification.getRepoUrl(),
-						"p2p_pending/" + alias, null /* 密钥 */);
-				boolean added = configService.addRepositoryConfig(newConfig); // Assume this method is synchronously
-																				// blocked
+				RepositoryConfig newConfig = new RepositoryConfig(
+						alias,
+						notification.getRepoUrl(),
+						"p2p_pending/" + alias,
+						null, // 密钥
+						SyncConfig.defaultConfig() // 使用默认同步配置
+				);
+				boolean added = configService.addRepositoryConfig(newConfig);
 				if (added) {
 					logger.info(
 							"P2P: Added new repository config for '{}' from notification. User needs to provide token locally.",
@@ -137,8 +144,7 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 						alias);
 			}
 		} else if (notification.getAction() == RepoConfigP2PNotification.Action.REMOVE) {
-			boolean removed = configService.removeRepositoryConfig(alias); // Assume this method is synchronously
-																			// blocked
+			boolean removed = configService.removeRepositoryConfig(alias);
 			if (removed) {
 				logger.info("P2P: Removed repository config for '{}' from notification.", alias);
 			} else {
@@ -146,33 +152,28 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 						alias);
 			}
 		} else if (notification.getAction() == RepoConfigP2PNotification.Action.UPDATE) {
-			// 处理更新操作
-			// 首先尝试使用旧别名查找仓库
 			String oldAlias = notification.getOldRepoAlias();
 			String newAlias = notification.getRepoAlias();
 
 			logger.info("P2P: Processing UPDATE notification from old alias '{}' to new alias '{}'", oldAlias,
 					newAlias);
 
-			// 首先尝试使用旧别名查找
 			configService.getRepositoryConfigByAlias(oldAlias).ifPresentOrElse(
 					existingConfig -> {
-						// 创建新的配置对象，保留本地token和路径，但更新别名和URL
 						RepositoryConfig updatedConfig = new RepositoryConfig(
-								newAlias, // 使用新别名
-								notification.getRepoUrl(), // 使用远程传来的新URL
-								existingConfig.localPath(), // 保留本地路径
-								existingConfig.token() // 保留本地token
+								newAlias,
+								notification.getRepoUrl(),
+								existingConfig.localPath(),
+								existingConfig.token(),
+								existingConfig.syncConfig() // 保留现有的同步配置
 						);
 
-						// 使用旧别名删除旧配置
 						boolean removed = configService.removeRepositoryConfig(oldAlias);
 						if (!removed) {
 							logger.warn("P2P: Failed to remove old repository config for '{}' during update.",
 									oldAlias);
 						}
 
-						// 添加新配置
 						boolean added = configService.addRepositoryConfig(updatedConfig);
 						if (added) {
 							logger.info("P2P: Successfully updated repository config from '{}' to '{}'.", oldAlias,
@@ -182,15 +183,14 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 						}
 					},
 					() -> {
-						// 如果找不到旧别名，尝试更新现有的相同别名配置
 						configService.getRepositoryConfigByAlias(newAlias).ifPresentOrElse(
 								existingConfig -> {
-									// 创建新的配置对象，保留本地token和路径
 									RepositoryConfig updatedConfig = new RepositoryConfig(
 											newAlias,
-											notification.getRepoUrl(), // 使用远程传来的新URL
-											existingConfig.localPath(), // 保留本地路径
-											existingConfig.token() // 保留本地token
+											notification.getRepoUrl(),
+											existingConfig.localPath(),
+											existingConfig.token(),
+											existingConfig.syncConfig() // 保留现有的同步配置
 									);
 
 									boolean updated = configService.updateRepositoryConfig(newAlias, updatedConfig);
@@ -205,13 +205,14 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 									logger.warn(
 											"P2P: Repository config not found for update with either old alias '{}' or new alias '{}'",
 											oldAlias, newAlias);
-									// 可选：如果URL不为空，可以考虑添加新配置
 									if (notification.getRepoUrl() != null && !notification.getRepoUrl().isBlank()) {
 										RepositoryConfig newConfig = new RepositoryConfig(
 												newAlias,
 												notification.getRepoUrl(),
 												"p2p_pending/" + newAlias,
-												null);
+												null,
+												SyncConfig.defaultConfig() // 使用默认同步配置
+										);
 										boolean added = configService.addRepositoryConfig(newConfig);
 										if (added) {
 											logger.info(
@@ -247,8 +248,7 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 						() -> logger.warn("P2P: Received sync request for unknown repository '{}'", repoId));
 	}
 
-	public Mono<Void> connectToPeer(String peerAddress /* 主机：端口 */) {
-		// Avoid repeated connections
+	public Mono<Void> connectToPeer(String peerAddress) {
 		if (clientSessions.containsKey(peerAddress) && clientSessions.get(peerAddress).isOpen()) {
 			logger.debug("Already connected or connecting to peer {}", peerAddress);
 			return Mono.empty();
@@ -257,19 +257,18 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 		URI wsUri = URI.create("ws://" + peerAddress + "/p2p");
 		logger.info("Attempting to connect to peer at {}", wsUri);
 
-		// 此特定客户连接的WebSockethandler
 		WebSocketHandler clientConnectionHandler = clientSession -> {
-			clientSessions.put(peerAddress, clientSession); // Use peerAddress as key
+			clientSessions.put(peerAddress, clientSession);
 			logger.info("Successfully connected to peer (client-side): {}, session ID: {}", peerAddress,
 					clientSession.getId());
 
-			Mono<Void> clientInput = clientSession.receive()
+			return clientSession.receive()
 					.map(WebSocketMessage::getPayloadAsText)
 					.doOnNext(payload -> {
 						logger.debug("Message received from peer server {}: {}", peerAddress, payload);
 						try {
 							P2PMessage p2pMessage = objectMapper.readValue(payload, P2PMessage.class);
-							dispatchP2PMessage(p2pMessage, clientSession); // Calling the distribution method
+							dispatchP2PMessage(p2pMessage, clientSession);
 						} catch (JsonProcessingException e) {
 							logger.error("Failed to parse P2PMessage from peer server {}: {}", peerAddress, payload, e);
 						} catch (Exception e) {
@@ -277,26 +276,17 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 									e);
 						}
 					})
-					.then();
-
-			// If the client needs to send a message immediately after connecting, you can
-			// add clientSession.send(...)
-			// Mono<Void> initialSend =
-			// clientSession.send(Mono.just(clientSession.textMessage("Hello from
-			// client!"));
-			// return initialSend.then(clientInput);
-
-			return clientInput.doFinally(signalType -> {
-				logger.info("Client connection to peer {} closed with signal {}", peerAddress, signalType);
-				clientSessions.remove(peerAddress);
-			});
+					.then()
+					.doFinally(signalType -> {
+						logger.info("Client connection to peer {} closed with signal {}", peerAddress, signalType);
+						clientSessions.remove(peerAddress);
+					});
 		};
 
 		return webSocketClient.execute(wsUri, clientConnectionHandler)
 				.doOnError(e -> {
 					logger.error("Error connecting to peer: {}, Error: {}", wsUri, e.getMessage());
-					clientSessions.remove(peerAddress); // Also remove when the connection fails to avoid inconsistent
-														// status
+					clientSessions.remove(peerAddress);
 				});
 	}
 

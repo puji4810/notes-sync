@@ -1,6 +1,6 @@
-package puji.p2p_notes_sync.service;
+package puji.p2p_notes_sync.service.docs;
 
-import puji.p2p_notes_sync.config.RepositoryConfig;
+import puji.p2p_notes_sync.model.config.RepositoryConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

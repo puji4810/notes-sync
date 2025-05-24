@@ -1,4 +1,4 @@
-package puji.p2p_notes_sync.config;
+package puji.p2p_notes_sync.config.app;
 
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;

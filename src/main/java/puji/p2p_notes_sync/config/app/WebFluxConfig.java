@@ -1,4 +1,4 @@
-package puji.p2p_notes_sync.config;
+package puji.p2p_notes_sync.config.app;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

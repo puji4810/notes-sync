@@ -1,11 +1,10 @@
 package puji.p2p_notes_sync.controller;
 
-import puji.p2p_notes_sync.config.RepositoryConfig;
-import puji.p2p_notes_sync.p2p.P2PCoordinatorService;
-import puji.p2p_notes_sync.service.ConfigService;
-import puji.p2p_notes_sync.service.GitService;
-import puji.p2p_notes_sync.service.MkDocsService;
-import puji.p2p_notes_sync.util.ResponseEntityUtil; // 您创建的工具类
+import puji.p2p_notes_sync.service.config.ConfigService;
+import puji.p2p_notes_sync.service.git.GitService;
+import puji.p2p_notes_sync.service.docs.MkDocsService;
+import puji.p2p_notes_sync.model.config.RepositoryConfig;
+import puji.p2p_notes_sync.util.ResponseEntityUtil;
 
 import java.util.Map;
 
@@ -22,33 +21,30 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
-import io.swagger.v3.oas.annotations.parameters.RequestBody; // 注意区分Spring的@RequestBody和Swagger的
+import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/api/v1/repositories")
-@Tag(name = "笔记仓库管理 (Repositories)", description = "用于管理和操作用户笔记Git仓库的API接口") // 类级别Tag
+@Tag(name = "笔记仓库管理 (Repositories)", description = "用于管理和操作用户笔记Git仓库的API接口")
 public class RepositoryController {
 
 	private final ConfigService configService;
 	private final GitService gitService;
 	private final MkDocsService mkDocsService;
-	private final P2PCoordinatorService p2pCoordinatorService; // P2P服务
 
 	@Autowired
-	public RepositoryController(ConfigService configService, GitService gitService, MkDocsService mkDocsService,
-			P2PCoordinatorService p2pCoordinatorService) {
+	public RepositoryController(ConfigService configService, GitService gitService, MkDocsService mkDocsService) {
 		this.configService = configService;
 		this.gitService = gitService;
 		this.mkDocsService = mkDocsService;
-		this.p2pCoordinatorService = p2pCoordinatorService;
 	}
 
 	@Operation(summary = "获取所有已配置的笔记仓库列表", description = "返回一个包含所有已注册笔记仓库配置的列表。")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "200", description = "成功获取仓库列表", content = @Content(mediaType = "application/json", schema = @Schema(implementation = RepositoryConfig[].class))) // 表示返回RepositoryConfig数组
+			@ApiResponse(responseCode = "200", description = "成功获取仓库列表", content = @Content(mediaType = "application/json", schema = @Schema(implementation = RepositoryConfig[].class)))
 	})
 	@GetMapping
 	public Flux<RepositoryConfig> getAllRepositories() {
@@ -58,19 +54,14 @@ public class RepositoryController {
 	@Operation(summary = "添加一个新的笔记仓库配置", description = "注册一个新的Git仓库供应用管理。别名在用户配置中应唯一。")
 	@ApiResponses(value = {
 			@ApiResponse(responseCode = "201", description = "仓库配置成功创建并返回", content = @Content(mediaType = "application/json", schema = @Schema(implementation = RepositoryConfig.class))),
-			@ApiResponse(responseCode = "400", description = "请求参数错误或仓库别名已存在", content = @Content) // 没有特定schema的空响应体
+			@ApiResponse(responseCode = "400", description = "请求参数错误或仓库别名已存在", content = @Content)
 	})
 	@PostMapping
 	public Mono<ResponseEntity<RepositoryConfig>> addRepository(
-			@RequestBody(description = "新的仓库配置信息。`token`字段用于在此设备本地进行安全存储和后续的Git操作。", required = true, content = @Content(schema = @Schema(implementation = RepositoryConfig.class)))
-			// 下面这个@org.springframework.web.bind.annotation.RequestBody是Spring
-			// MVC/WebFlux的注解，用于参数绑定
-			@org.springframework.web.bind.annotation.RequestBody RepositoryConfig newRepoConfig) {
+			@RequestBody(description = "新的仓库配置信息。`token`字段用于在此设备本地进行安全存储和后续的Git操作。", required = true, content = @Content(schema = @Schema(implementation = RepositoryConfig.class))) @org.springframework.web.bind.annotation.RequestBody RepositoryConfig newRepoConfig) {
 		return Mono.fromCallable(() -> {
 			boolean success = configService.addRepositoryConfig(newRepoConfig);
 			if (success) {
-				// 广播新仓库配置到其他节点
-				p2pCoordinatorService.broadcastNewRepositoryConfiguration(newRepoConfig);
 				return ResponseEntity.status(HttpStatus.CREATED).body(newRepoConfig);
 			} else {
 				return ResponseEntityUtil.<RepositoryConfig>badRequest();
@@ -104,17 +95,12 @@ public class RepositoryController {
 		return Mono.fromCallable(() -> {
 			boolean success = configService.updateRepositoryConfig(repoAlias, updatedRepoConfig);
 			if (success) {
-				// 更新成功后，广播更新配置到其他节点
-				p2pCoordinatorService.broadcastUpdateRepositoryConfiguration(repoAlias, updatedRepoConfig);
 				return ResponseEntity.ok(updatedRepoConfig);
 			} else {
-				// 根据updateRepositoryConfig的内部逻辑，失败可能是404或400
-				// 为了简化，如果configService不抛出特定异常来区分，我们这里统一用404或400
-				// 假设 updateRepositoryConfig 如果找不到旧别名会返回false, 如果新别名冲突也返回false
 				if (configService.getRepositoryConfigByAlias(repoAlias).isEmpty()) {
 					return ResponseEntityUtil.<RepositoryConfig>notFound();
 				} else {
-					return ResponseEntityUtil.<RepositoryConfig>badRequest(); // 例如，新别名冲突
+					return ResponseEntityUtil.<RepositoryConfig>badRequest();
 				}
 			}
 		}).subscribeOn(Schedulers.boundedElastic());
@@ -130,10 +116,6 @@ public class RepositoryController {
 			@Parameter(description = "要删除的仓库别名", required = true, example = "obsolete-notes") @PathVariable String repoAlias) {
 		return Mono.fromCallable(() -> {
 			boolean success = configService.removeRepositoryConfig(repoAlias);
-			if (success) {
-				// 删除成功后，广播删除配置到其他节点
-				p2pCoordinatorService.broadcastRemovedRepositoryConfiguration(repoAlias);
-			}
 			return success;
 		})
 				.subscribeOn(Schedulers.boundedElastic())
@@ -144,7 +126,7 @@ public class RepositoryController {
 
 	@Operation(summary = "同步指定别名的笔记仓库", description = "对指定的笔记仓库执行`git pull`操作，从远程拉取最新更改。如果本地仓库不存在，会先尝试`git clone`。")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "200", description = "同步操作已成功发起或完成，返回Git操作的输出信息", content = @Content(mediaType = "text/plain")), // Git输出通常是文本
+			@ApiResponse(responseCode = "200", description = "同步操作已成功发起或完成，返回Git操作的输出信息", content = @Content(mediaType = "text/plain")),
 			@ApiResponse(responseCode = "404", description = "未找到具有指定别名的仓库", content = @Content(mediaType = "text/plain"))
 	})
 	@PostMapping("/{repoAlias}/sync")
@@ -152,13 +134,7 @@ public class RepositoryController {
 			@Parameter(description = "要同步的仓库别名", required = true, example = "my-work-notes") @PathVariable String repoAlias) {
 		return Mono.justOrEmpty(configService.getRepositoryConfigByAlias(repoAlias))
 				.flatMap(config -> Mono.fromCallable(() -> {
-					String localSyncResult = gitService.pullRepository(config); // 或其他同步方法
-					// 本地同步后，广播P2P同步请求
-					if (localSyncResult.toLowerCase().contains("successful")
-							|| !localSyncResult.toLowerCase().contains("fail")) { // 简单判断成功
-						// p2pCoordinatorService.broadcastSyncRequest(config.alias()); // 使用别名或URL
-						// 这里认为不需要同步，每个用户的别名是可以不同的
-					}
+					String localSyncResult = gitService.pullRepository(config);
 					return localSyncResult;
 				})
 						.subscribeOn(Schedulers.boundedElastic())

@@ -1,4 +1,4 @@
-package puji.p2p_notes_sync.service;
+package puji.p2p_notes_sync.service.git;
 
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.PullResult;
@@ -14,7 +14,7 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import puji.p2p_notes_sync.config.RepositoryConfig;
+import puji.p2p_notes_sync.model.config.RepositoryConfig;
 
 import java.io.File;
 import java.io.IOException;

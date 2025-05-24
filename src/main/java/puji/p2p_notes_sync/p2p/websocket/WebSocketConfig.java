@@ -1,4 +1,4 @@
-package puji.p2p_notes_sync.p2p;
+package puji.p2p_notes_sync.p2p.websocket;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;

@@ -1,12 +1,16 @@
-package puji.p2p_notes_sync.p2p;
+package puji.p2p_notes_sync.p2p.coordinator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import puji.p2p_notes_sync.config.RepositoryConfig; // 从你的项目导入
+import puji.p2p_notes_sync.model.config.RepositoryConfig;
 import puji.p2p_notes_sync.p2p.dto.RepoConfigP2PNotification;
 import puji.p2p_notes_sync.p2p.dto.RepoSyncP2PRequest;
+import puji.p2p_notes_sync.p2p.websocket.P2PWebSocketHandlerReactive;
+import puji.p2p_notes_sync.model.config.SyncConfig;
+import puji.p2p_notes_sync.model.sync.SyncStrategy;
+import puji.p2p_notes_sync.model.sync.ConflictResolution;
 
 @Service
 public class P2PCoordinatorService {

@@ -1,4 +1,4 @@
-package puji.p2p_notes_sync.p2p;
+package puji.p2p_notes_sync.p2p.discovery;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,11 +14,15 @@ import javax.jmdns.ServiceEvent;
 
 import java.io.IOException;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Enumeration;
+
+import puji.p2p_notes_sync.p2p.websocket.P2PWebSocketHandlerReactive;
 
 @Service
 public class MDNSService {
@@ -134,20 +138,23 @@ public class MDNSService {
 				if (hostAddress != null) {
 					String peerAddress = hostAddress + ":" + info.getPort();
 					if (discoveredPeers.add(peerAddress)) {
-						logger.info("Peer discovered and resolved: {} ({}) at {}. Attempting to connect.", peerAddress, info.getName(),
+						logger.info("Peer discovered and resolved: {} ({}) at {}. Attempting to connect.", peerAddress,
+								info.getName(),
 								info.getApplication());
 						// 自动连接到新发现的节点
 						webSocketHandler.connectToPeer(peerAddress)
-							.subscribe(
-								null, // onComplete: do nothing
-								error -> logger.error("Failed to connect to peer {} after discovery: {}", peerAddress, error.getMessage())
-							);
+								.subscribe(
+										null, // onComplete: do nothing
+										error -> logger.error("Failed to connect to peer {} after discovery: {}",
+												peerAddress, error.getMessage()));
 					} else {
 						logger.info("Peer {} ({}) already discovered.", peerAddress, info.getName());
 					}
 				} else {
-					logger.warn("Could not resolve host address for service: {}. IPv4 addresses: {}, IPv6 addresses: {}, Other addresses: {}", 
-								info.getName(), info.getInet4Addresses().length, info.getInet6Addresses().length, info.getInetAddresses().length);
+					logger.warn(
+							"Could not resolve host address for service: {}. IPv4 addresses: {}, IPv6 addresses: {}, Other addresses: {}",
+							info.getName(), info.getInet4Addresses().length, info.getInet6Addresses().length,
+							info.getInetAddresses().length);
 				}
 			} else {
 				if (info == null) {
