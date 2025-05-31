@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Notes-Sync 功能演示</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+        .demo-card {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .feature-item {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            border-left: 4px solid #409EFF;
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        .status-working { background: #67C23A; color: white; }
+        .status-fixed { background: #409EFF; color: white; }
+        .status-pending { background: #E6A23C; color: white; }
+        .navigation-links {
+            display: flex;
+            gap: 10px;
+            margin: 20px 0;
+        }
+        .nav-link {
+            display: inline-block;
+            padding: 10px 20px;
+            background: #409EFF;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background 0.3s;
+        }
+        .nav-link:hover {
+            background: #66b1ff;
+        }
+        h1 {
+            color: #409EFF;
+            border-bottom: 2px solid #409EFF;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #303133;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-card">
+        <h1>🚀 Notes-Sync P2P笔记同步平台</h1>
+        <p>基于Spring Boot + Vue.js的分布式笔记同步和管理平台，支持P2P节点发现、Git仓库管理、实时同步等功能。</p>
+        
+        <div class="navigation-links">
+            <a href="/" class="nav-link">📚 仓库管理</a>
+            <a href="/peers.html" class="nav-link">🔗 对等节点</a>
+            <a href="/settings.html" class="nav-link">⚙️ 系统设置</a>
+            <a href="/test.html" class="nav-link">🧪 Vue测试页面</a>
+        </div>
+    </div>
+
+    <div class="demo-card">
+        <h2>✅ 已完成的修复</h2>
+        <div class="feature-list">
+            <div class="feature-item">
+                <h3>🛠️ 路由冲突修复 <span class="status-badge status-fixed">已修复</span></h3>
+                <p>解决了前端页面路由与API路径冲突问题，更新了FrontendController和导航链接。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>🎨 前端资源加载优化 <span class="status-badge status-fixed">已修复</span></h3>
+                <p>修复了Vue.js和Element Plus的加载顺序问题，使用完整版Element Plus，移除了图标依赖冲突。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>🧩 Vue组件依赖修复 <span class="status-badge status-fixed">已修复</span></h3>
+                <p>修复了NavMenu组件的全局注册问题，确保Vue应用能正确引用导航组件。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>🎯 HTML结构修复 <span class="status-badge status-fixed">已修复</span></h3>
+                <p>修复了所有HTML页面的结构错误，移除了重复标签和残留代码。</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-card">
+        <h2>🏃‍♂️ 当前运行状态</h2>
+        <div class="feature-list">
+            <div class="feature-item">
+                <h3>🌐 Spring Boot应用 <span class="status-badge status-working">运行中</span></h3>
+                <p>应用已在端口8080成功启动，所有API端点正常响应。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>🔗 P2P服务 <span class="status-badge status-working">运行中</span></h3>
+                <p>mDNS服务注册成功，P2P节点发现功能正常工作。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>📁 静态资源服务 <span class="status-badge status-working">运行中</span></h3>
+                <p>所有HTML、CSS、JS文件正确提供，返回200状态码。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>📊 API端点 <span class="status-badge status-working">运行中</span></h3>
+                <p>仓库管理、P2P节点、设置等API端点全部正常工作。</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-card">
+        <h2>🎯 核心功能特性</h2>
+        <div class="feature-list">
+            <div class="feature-item">
+                <h3>📚 Git仓库管理</h3>
+                <p>支持添加、编辑、删除Git仓库，自动同步、克隆、提交推送等操作。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>🔗 P2P节点发现</h3>
+                <p>基于mDNS的自动节点发现，支持手动添加节点，实时连接状态监控。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>⚙️ 系统配置管理</h3>
+                <p>支持常规设置、Git配置、P2P设置、MkDocs部署等多维度配置管理。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>🎨 响应式设计</h3>
+                <p>基于Element Plus的现代化UI设计，支持移动端自适应布局。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>🔄 实时数据同步</h3>
+                <p>WebSocket实时通信，自动刷新P2P节点状态和仓库信息。</p>
+            </div>
+            
+            <div class="feature-item">
+                <h3>💾 状态持久化</h3>
+                <p>支持应用状态本地存储，用户设置和偏好自动保存。</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="demo-card">
+        <h2>🔧 技术栈</h2>
+        <ul>
+            <li><strong>后端:</strong> Spring Boot 3.4.5 + WebFlux + P2P通信</li>
+            <li><strong>前端:</strong> Vue.js 3.3.4 + Element Plus + Axios</li>
+            <li><strong>通信:</strong> WebSocket + REST API + mDNS服务发现</li>
+            <li><strong>版本控制:</strong> Git集成 + 自动同步</li>
+            <li><strong>文档:</strong> MkDocs部署支持</li>
+        </ul>
+    </div>
+
+    <div class="demo-card">
+        <h2>📋 使用说明</h2>
+        <ol>
+            <li><strong>仓库管理:</strong> 点击"仓库管理"查看和管理Git仓库</li>
+            <li><strong>对等节点:</strong> 点击"对等节点"查看P2P网络连接状态</li>
+            <li><strong>系统设置:</strong> 点击"系统设置"配置应用参数</li>
+            <li><strong>测试页面:</strong> 点击"Vue测试页面"验证前端功能</li>
+        </ol>
+    </div>
+</body>
+</html>

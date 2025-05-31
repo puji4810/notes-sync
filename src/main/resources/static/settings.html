@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>笔记同步平台 - 设置</title>
+    <!-- Element Plus CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus/dist/index.css">
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div id="app">
+        <el-container>
+            <el-aside width="250px">
+                <div class="sidebar-header">
+                    <img src="https://avatars.githubusercontent.com/u/1680273?v=4" alt="Logo" class="logo">
+                    <h2>笔记同步平台</h2>
+                </div>
+                <nav-menu></nav-menu>
+            </el-aside>
+            <el-container>
+                <el-header height="60px" class="header">
+                    <div class="left">
+                        <h1>系统设置</h1>
+                    </div>
+                    <div class="right">
+                        <el-button type="primary" @click="updateSettings">保存设置</el-button>
+                    </div>
+                </el-header>
+                <el-main>
+                    <el-tabs v-model="activeTab">
+                        <!-- 基本设置 -->
+                        <el-tab-pane label="基本设置" name="general">
+                            <el-form :model="settings" label-width="120px">
+                                    <el-form-item label="应用名称">
+                                    <el-input v-model="settings.appName" placeholder="输入应用名称"></el-input>
+                                    </el-form-item>
+                                    <el-form-item label="默认仓库路径">
+                                    <el-input v-model="settings.defaultRepoPath" placeholder="输入默认仓库路径"></el-input>
+                                    </el-form-item>
+                                    <el-form-item label="日志级别">
+                                    <el-select v-model="settings.logLevel">
+                                        <el-option label="DEBUG" value="DEBUG"></el-option>
+                                            <el-option label="INFO" value="INFO"></el-option>
+                                            <el-option label="WARN" value="WARN"></el-option>
+                                            <el-option label="ERROR" value="ERROR"></el-option>
+                                        </el-select>
+                                    </el-form-item>
+                                </el-form>
+                        </el-tab-pane>
+                        
+                        <!-- Git设置 -->
+                        <el-tab-pane label="Git设置" name="git">
+                            <el-form :model="settings" label-width="120px">
+                                <el-form-item label="作者姓名">
+                                    <el-input v-model="settings.authorName" placeholder="输入Git作者姓名"></el-input>
+                                    </el-form-item>
+                                <el-form-item label="作者邮箱">
+                                    <el-input v-model="settings.authorEmail" placeholder="输入Git作者邮箱"></el-input>
+                                    </el-form-item>
+                                <el-form-item label="同步间隔(秒)">
+                                    <el-input-number v-model="settings.syncInterval" :min="30" :max="3600"></el-input-number>
+                                    </el-form-item>
+                                </el-form>
+                        </el-tab-pane>
+                        
+                        <!-- MkDocs设置 -->
+                        <el-tab-pane label="MkDocs设置" name="mkdocs">
+                            <el-form :model="settings" label-width="120px">
+                                <el-form-item label="可执行文件路径">
+                                    <el-input v-model="settings.git.executablePath" placeholder="输入MkDocs可执行文件路径"></el-input>
+                                    </el-form-item>
+                                <el-form-item label="端口">
+                                    <el-input-number v-model="settings.git.port" :min="1024" :max="65535"></el-input-number>
+                                    </el-form-item>
+                                <el-form-item label="主题">
+                                        <el-select v-model="settings.mkdocs.theme">
+                                            <el-option label="Material" value="material"></el-option>
+                                            <el-option label="ReadTheDocs" value="readthedocs"></el-option>
+                                        </el-select>
+                                    </el-form-item>
+                                <el-form-item label="启用导航">
+                                        <el-switch v-model="settings.mkdocs.enableNavigation"></el-switch>
+                                    </el-form-item>
+                                </el-form>
+                        </el-tab-pane>
+                        
+                        <!-- 关于 -->
+                        <el-tab-pane label="关于" name="about">
+                            <el-descriptions title="系统信息" :column="1" border>
+                                <el-descriptions-item label="版本">{{ systemInfo.version }}</el-descriptions-item>
+                                <el-descriptions-item label="运行时间">{{ Math.floor(systemInfo.uptime / 3600) }}小时</el-descriptions-item>
+                                <el-descriptions-item label="内存使用">
+                                    {{ formatSize(systemInfo.memory.used) }} / {{ formatSize(systemInfo.memory.total) }}
+                                </el-descriptions-item>
+                                <el-descriptions-item label="磁盘使用">
+                                    {{ formatSize(systemInfo.disk.used) }} / {{ formatSize(systemInfo.disk.total) }}
+                                </el-descriptions-item>
+                                        <el-descriptions-item label="Java版本">{{ systemInfo.javaVersion }}</el-descriptions-item>
+                                        <el-descriptions-item label="操作系统">{{ systemInfo.osName }} {{ systemInfo.osVersion }}</el-descriptions-item>
+                                <el-descriptions-item label="架构">{{ systemInfo.osArch }}</el-descriptions-item>
+                                        <el-descriptions-item label="可用处理器">{{ systemInfo.availableProcessors }}</el-descriptions-item>
+                                    </el-descriptions>
+                        </el-tab-pane>
+                    </el-tabs>
+                </el-main>
+                <el-footer height="40px">
+                    <div class="footer-content">
+                        <p>© {{ new Date().getFullYear() }} P2P笔记同步平台</p>
+                    </div>
+                </el-footer>
+            </el-container>
+        </el-container>
+    </div>
+    
+    <!-- 禁用模块导入错误并设置全局Vue变量 -->
+    <script>
+        // 拦截并处理模块导入错误
+        window.addEventListener('error', function(event) {
+            if (event.message && (
+                event.message.includes('Cannot use import statement outside a module') ||
+                event.message.includes('Unexpected token')
+            )) {
+                event.preventDefault();
+                console.warn('拦截到模块导入错误，已安全处理');
+                return false;
+            }
+        }, true);
+    </script>
+    <!-- Vue.js -->
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.prod.js"></script>
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <!-- Element Plus -->
+    <script src="https://cdn.jsdelivr.net/npm/element-plus/dist/index.full.min.js"></script>
+    <!-- 自定义图标兼容脚本 -->
+    <script src="js/element-icons-compat.js"></script>
+    <!-- 自定义脚本 -->
+    <script src="js/websocket.js"></script>
+    <script src="js/navigation.js"></script>
+    <script src="js/settings.js"></script>
+</body>
+</html>

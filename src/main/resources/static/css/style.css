@@ -1,0 +1,299 @@
+/* 全局样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: #333;
+    background-color: #f0f2f5;
+    overflow-x: hidden;
+}
+
+/* 响应式设计 */
+@media screen and (max-width: 768px) {
+    .el-aside {
+        width: 64px !important;
+    }
+    
+    .sidebar-header h2,
+    .el-menu-item span {
+        display: none;
+    }
+    
+    .el-menu--collapse {
+        width: 64px;
+    }
+    
+    .el-menu-item {
+        padding: 0 20px !important;
+    }
+    
+    .header h1 {
+        font-size: 1.2rem;
+    }
+    
+    .el-table {
+        width: 100% !important;
+        font-size: 0.85rem;
+    }
+}
+
+/* 侧边栏样式 */
+.el-aside {
+    background-color: #001529;
+    color: white;
+    overflow: hidden;
+    height: 100vh;
+    transition: width 0.3s;
+}
+
+.sidebar-header {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    flex-direction: column;
+    margin-bottom: 20px;
+}
+
+.logo {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    margin-bottom: 10px;
+}
+
+.sidebar-header h2 {
+    font-size: 1.2rem;
+    margin-top: 5px;
+}
+
+/* 修改Element Plus菜单样式 */
+.el-menu {
+    border-right: none !important;
+}
+
+/* 头部样式 */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: white;
+    padding: 0 20px;
+    box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+}
+
+.header .left h1 {
+    font-size: 1.5rem;
+    color: #333;
+}
+
+/* 主内容区域样式 */
+.el-main {
+    padding: 20px;
+    background-color: #f0f2f5;
+}
+
+/* 表格样式增强 */
+.el-table {
+    border-radius: 4px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+/* 按钮组样式 */
+.el-button-group {
+    margin-bottom: 15px;
+}
+
+/* 状态标签样式 */
+.status-tag {
+    margin-right: 5px;
+}
+
+/* 底部样式 */
+.el-footer {
+    background-color: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #666;
+    font-size: 0.9rem;
+    border-top: 1px solid #e8e8e8;
+}
+
+.footer-content {
+    text-align: center;
+}
+
+/* 对话框样式优化 */
+.dialog-footer {
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+    .el-aside {
+        width: 80px !important;
+    }
+    
+    .sidebar-header h2 {
+        display: none;
+    }
+    
+    .el-menu-item span {
+        display: none;
+    }
+}
+
+/* 消息通知样式 */
+.notification {
+    margin-bottom: 15px;
+}
+
+/* 加载指示器样式 */
+.loading-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100px;
+}
+
+/* 卡片样式增强 */
+.el-card {
+    margin-bottom: 20px;
+    transition: all 0.3s;
+}
+
+.el-card:hover {
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transform: translateY(-2px);
+}
+
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+}
+
+/* P2P节点页面样式 */
+.stats-row {
+    margin-bottom: 20px;
+}
+
+.stats-card {
+    text-align: center;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.stats-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.stats-card .el-statistic__content {
+    font-size: 24px;
+    font-weight: bold;
+    color: #409eff;
+}
+
+.stats-card .el-statistic__title {
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.peers-table-card {
+    border-radius: 8px;
+}
+
+.peers-table-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    color: #333;
+}
+
+/* 节点状态标签颜色 */
+.el-tag.el-tag--success {
+    background-color: #f0f9ff;
+    border-color: #67c23a;
+    color: #67c23a;
+}
+
+.el-tag.el-tag--warning {
+    background-color: #fdf6ec;
+    border-color: #e6a23c;
+    color: #e6a23c;
+}
+
+.el-tag.el-tag--info {
+    background-color: #f4f4f5;
+    border-color: #909399;
+    color: #909399;
+}
+
+/* 表单提示样式 */
+.form-tip {
+    font-size: 12px;
+    color: #999;
+    margin-top: 4px;
+}
+
+/* 按钮组样式优化 */
+.el-button-group .el-button {
+    margin-right: 0;
+}
+
+.el-button-group .el-button + .el-button {
+    margin-left: 0;
+}
+
+/* 空状态样式 */
+.el-empty {
+    padding: 40px 0;
+}
+
+/* 响应式优化 - P2P页面 */
+@media (max-width: 1200px) {
+    .stats-row .el-col {
+        margin-bottom: 10px;
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-row .el-col {
+        width: 50% !important;
+    }
+    
+    .el-table-column {
+        min-width: 120px !important;
+    }
+    
+    .el-button-group {
+        flex-direction: column;
+    }
+    
+    .el-button-group .el-button {
+        margin-bottom: 4px;
+        border-radius: 4px !important;
+    }
+}

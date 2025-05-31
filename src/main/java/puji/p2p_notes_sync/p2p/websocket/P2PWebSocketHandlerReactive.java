@@ -27,6 +27,11 @@ import puji.p2p_notes_sync.p2p.discovery.MDNSService;
 
 import java.net.URI;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+
+import java.net.URI;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Component
@@ -288,6 +293,78 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 					logger.error("Error connecting to peer: {}, Error: {}", wsUri, e.getMessage());
 					clientSessions.remove(peerAddress);
 				});
+	}
+
+	/**
+	 * 获取当前已连接的对等节点地址集合
+	 * 
+	 * @return 已连接的对等节点地址集合
+	 */
+	public Set<String> getConnectedPeers() {
+		Set<String> connectedPeers = ConcurrentHashMap.newKeySet();
+
+		// 添加作为客户端连接的对等节点
+		clientSessions.entrySet().stream()
+				.filter(entry -> entry.getValue().isOpen())
+				.forEach(entry -> connectedPeers.add(entry.getKey()));
+
+		// 添加作为服务器接收的连接（需要从session信息中提取对等节点地址）
+		serverSessions.values().stream()
+				.filter(WebSocketSession::isOpen)
+				.forEach(session -> {
+					// 从session的远程地址提取对等节点地址
+					String remoteAddress = session.getHandshakeInfo().getRemoteAddress().toString();
+					if (remoteAddress != null && remoteAddress.contains("/")) {
+						// 提取IP:Port格式的地址
+						String peerAddress = remoteAddress.substring(remoteAddress.lastIndexOf("/") + 1);
+						connectedPeers.add(peerAddress);
+					}
+				});
+
+		return connectedPeers;
+	}
+
+	/**
+	 * 断开与指定对等节点的连接
+	 * 
+	 * @param peerAddress 对等节点地址
+	 * @return Mono<Void>
+	 */
+	public Mono<Void> disconnectFromPeer(String peerAddress) {
+		logger.info("Attempting to disconnect from peer: {}", peerAddress);
+
+		// 断开作为客户端的连接
+		WebSocketSession clientSession = clientSessions.get(peerAddress);
+		if (clientSession != null && clientSession.isOpen()) {
+			return clientSession.close()
+					.doOnSuccess(v -> {
+						logger.info("Successfully disconnected from peer (client-side): {}", peerAddress);
+						clientSessions.remove(peerAddress);
+					})
+					.doOnError(e -> logger.error("Error disconnecting from peer (client-side) {}: {}", peerAddress,
+							e.getMessage()));
+		}
+
+		// 断开作为服务器的连接
+		// 由于服务器端session以sessionId为key，需要查找匹配的session
+		for (Map.Entry<String, WebSocketSession> entry : serverSessions.entrySet()) {
+			WebSocketSession session = entry.getValue();
+			if (session.isOpen()) {
+				String remoteAddress = session.getHandshakeInfo().getRemoteAddress().toString();
+				if (remoteAddress != null && remoteAddress.contains(peerAddress)) {
+					return session.close()
+							.doOnSuccess(v -> {
+								logger.info("Successfully disconnected from peer (server-side): {}", peerAddress);
+								serverSessions.remove(entry.getKey());
+							})
+							.doOnError(e -> logger.error("Error disconnecting from peer (server-side) {}: {}",
+									peerAddress, e.getMessage()));
+				}
+			}
+		}
+
+		logger.warn("No active connection found for peer: {}", peerAddress);
+		return Mono.empty();
 	}
 
 	public void broadcastMessage(P2PMessage message) {

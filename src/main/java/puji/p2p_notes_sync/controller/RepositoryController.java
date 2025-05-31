@@ -7,6 +7,8 @@ import puji.p2p_notes_sync.model.config.RepositoryConfig;
 import puji.p2p_notes_sync.util.ResponseEntityUtil;
 
 import java.util.Map;
+import java.util.HashMap;
+import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -44,84 +46,143 @@ public class RepositoryController {
 
 	@Operation(summary = "获取所有已配置的笔记仓库列表", description = "返回一个包含所有已注册笔记仓库配置的列表。")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "200", description = "成功获取仓库列表", content = @Content(mediaType = "application/json", schema = @Schema(implementation = RepositoryConfig[].class)))
+			@ApiResponse(responseCode = "200", description = "成功获取仓库列表", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class)))
 	})
 	@GetMapping
-	public Flux<RepositoryConfig> getAllRepositories() {
-		return Flux.fromIterable(configService.getAllRepositoryConfigs());
+	public Mono<ResponseEntity<Map<String, Object>>> getAllRepositories() {
+		return Mono.fromCallable(() -> {
+			List<RepositoryConfig> repositories = configService.getAllRepositoryConfigs();
+			Map<String, Object> response = new HashMap<>();
+			response.put("success", true);
+			response.put("repositories", repositories);
+			response.put("repositoryCount", repositories.size());
+			return ResponseEntity.ok(response);
+		}).subscribeOn(Schedulers.boundedElastic())
+				.onErrorResume(throwable -> {
+					Map<String, Object> errorResponse = new HashMap<>();
+					errorResponse.put("success", false);
+					errorResponse.put("error", "Failed to retrieve repositories: " + throwable.getMessage());
+					return Mono.just(ResponseEntity.internalServerError().body(errorResponse));
+				});
 	}
 
 	@Operation(summary = "添加一个新的笔记仓库配置", description = "注册一个新的Git仓库供应用管理。别名在用户配置中应唯一。")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "201", description = "仓库配置成功创建并返回", content = @Content(mediaType = "application/json", schema = @Schema(implementation = RepositoryConfig.class))),
+			@ApiResponse(responseCode = "201", description = "仓库配置成功创建并返回", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class))),
 			@ApiResponse(responseCode = "400", description = "请求参数错误或仓库别名已存在", content = @Content)
 	})
 	@PostMapping
-	public Mono<ResponseEntity<RepositoryConfig>> addRepository(
+	public Mono<ResponseEntity<Map<String, Object>>> addRepository(
 			@RequestBody(description = "新的仓库配置信息。`token`字段用于在此设备本地进行安全存储和后续的Git操作。", required = true, content = @Content(schema = @Schema(implementation = RepositoryConfig.class))) @org.springframework.web.bind.annotation.RequestBody RepositoryConfig newRepoConfig) {
 		return Mono.fromCallable(() -> {
 			boolean success = configService.addRepositoryConfig(newRepoConfig);
+			Map<String, Object> response = new HashMap<>();
+
 			if (success) {
-				return ResponseEntity.status(HttpStatus.CREATED).body(newRepoConfig);
+				response.put("success", true);
+				response.put("message", "Repository added successfully");
+				response.put("repository", newRepoConfig);
+				return ResponseEntity.status(HttpStatus.CREATED).body(response);
 			} else {
-				return ResponseEntityUtil.<RepositoryConfig>badRequest();
+				response.put("success", false);
+				response.put("error", "Repository with this alias already exists");
+				return ResponseEntity.badRequest().body(response);
 			}
-		}).subscribeOn(Schedulers.boundedElastic());
+		}).subscribeOn(Schedulers.boundedElastic())
+				.onErrorResume(throwable -> {
+					Map<String, Object> errorResponse = new HashMap<>();
+					errorResponse.put("success", false);
+					errorResponse.put("error", "Failed to add repository: " + throwable.getMessage());
+					return Mono.just(ResponseEntity.internalServerError().body(errorResponse));
+				});
 	}
 
 	@Operation(summary = "获取指定别名的笔记仓库配置", description = "根据提供的仓库别名查找并返回其详细配置信息。")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "200", description = "成功找到并返回仓库配置", content = @Content(mediaType = "application/json", schema = @Schema(implementation = RepositoryConfig.class))),
+			@ApiResponse(responseCode = "200", description = "成功找到并返回仓库配置", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class))),
 			@ApiResponse(responseCode = "404", description = "未找到具有指定别名的仓库", content = @Content)
 	})
 	@GetMapping("/{repoAlias}")
-	public Mono<ResponseEntity<RepositoryConfig>> getRepositoryByAlias(
+	public Mono<ResponseEntity<Map<String, Object>>> getRepositoryByAlias(
 			@Parameter(description = "要查询的仓库别名", required = true, example = "my-work-notes") @PathVariable String repoAlias) {
 		return Mono.justOrEmpty(configService.getRepositoryConfigByAlias(repoAlias))
-				.map(config -> ResponseEntity.ok(config))
-				.defaultIfEmpty(ResponseEntityUtil.<RepositoryConfig>notFound());
+				.map(config -> {
+					Map<String, Object> response = new HashMap<>();
+					response.put("success", true);
+					response.put("repository", config);
+					return ResponseEntity.ok(response);
+				})
+				.defaultIfEmpty(ResponseEntity.status(HttpStatus.NOT_FOUND)
+						.body(Map.of("success", false, "error", "Repository not found")));
 	}
 
 	@Operation(summary = "更新指定别名的笔记仓库配置", description = "修改已存在的笔记仓库的配置信息。如果别名被修改，请确保新别名未被其他仓库占用。")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "200", description = "仓库配置成功更新并返回", content = @Content(mediaType = "application/json", schema = @Schema(implementation = RepositoryConfig.class))),
+			@ApiResponse(responseCode = "200", description = "仓库配置成功更新并返回", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class))),
 			@ApiResponse(responseCode = "404", description = "未找到具有指定别名的仓库进行更新", content = @Content),
 			@ApiResponse(responseCode = "400", description = "更新请求不合法（例如，新别名冲突）", content = @Content)
 	})
 	@PutMapping("/{repoAlias}")
-	public Mono<ResponseEntity<RepositoryConfig>> updateRepository(
+	public Mono<ResponseEntity<Map<String, Object>>> updateRepository(
 			@Parameter(description = "要更新的仓库的当前别名", required = true, example = "old-alias") @PathVariable String repoAlias,
 			@RequestBody(description = "更新后的仓库配置信息。如果`alias`字段与URL中的`repoAlias`不同，则表示尝试修改别名。", required = true, content = @Content(schema = @Schema(implementation = RepositoryConfig.class))) @org.springframework.web.bind.annotation.RequestBody RepositoryConfig updatedRepoConfig) {
 		return Mono.fromCallable(() -> {
 			boolean success = configService.updateRepositoryConfig(repoAlias, updatedRepoConfig);
+			Map<String, Object> response = new HashMap<>();
+
 			if (success) {
-				return ResponseEntity.ok(updatedRepoConfig);
+				response.put("success", true);
+				response.put("message", "Repository updated successfully");
+				response.put("repository", updatedRepoConfig);
+				return ResponseEntity.ok(response);
 			} else {
 				if (configService.getRepositoryConfigByAlias(repoAlias).isEmpty()) {
-					return ResponseEntityUtil.<RepositoryConfig>notFound();
+					response.put("success", false);
+					response.put("error", "Repository not found");
+					return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
 				} else {
-					return ResponseEntityUtil.<RepositoryConfig>badRequest();
+					response.put("success", false);
+					response.put("error", "Repository alias conflict");
+					return ResponseEntity.badRequest().body(response);
 				}
 			}
-		}).subscribeOn(Schedulers.boundedElastic());
+		}).subscribeOn(Schedulers.boundedElastic())
+				.onErrorResume(throwable -> {
+					Map<String, Object> errorResponse = new HashMap<>();
+					errorResponse.put("success", false);
+					errorResponse.put("error", "Failed to update repository: " + throwable.getMessage());
+					return Mono.just(ResponseEntity.internalServerError().body(errorResponse));
+				});
 	}
 
 	@Operation(summary = "删除指定别名的笔记仓库配置", description = "从应用中移除对某个笔记仓库的管理，本地文件不会被删除。")
 	@ApiResponses(value = {
-			@ApiResponse(responseCode = "204", description = "仓库配置成功删除 (无返回内容)"),
+			@ApiResponse(responseCode = "200", description = "仓库配置成功删除", content = @Content(mediaType = "application/json", schema = @Schema(implementation = Map.class))),
 			@ApiResponse(responseCode = "404", description = "未找到具有指定别名的仓库进行删除", content = @Content)
 	})
 	@DeleteMapping("/{repoAlias}")
-	public Mono<ResponseEntity<Void>> removeRepository(
+	public Mono<ResponseEntity<Map<String, Object>>> removeRepository(
 			@Parameter(description = "要删除的仓库别名", required = true, example = "obsolete-notes") @PathVariable String repoAlias) {
 		return Mono.fromCallable(() -> {
 			boolean success = configService.removeRepositoryConfig(repoAlias);
-			return success;
-		})
-				.subscribeOn(Schedulers.boundedElastic())
-				.flatMap(success -> success
-						? Mono.just(ResponseEntity.noContent().<Void>build())
-						: Mono.just(ResponseEntityUtil.<Void>notFound()));
+			Map<String, Object> response = new HashMap<>();
+
+			if (success) {
+				response.put("success", true);
+				response.put("message", "Repository removed successfully");
+				return ResponseEntity.ok(response);
+			} else {
+				response.put("success", false);
+				response.put("error", "Repository not found");
+				return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+			}
+		}).subscribeOn(Schedulers.boundedElastic())
+				.onErrorResume(throwable -> {
+					Map<String, Object> errorResponse = new HashMap<>();
+					errorResponse.put("success", false);
+					errorResponse.put("error", "Failed to remove repository: " + throwable.getMessage());
+					return Mono.just(ResponseEntity.internalServerError().body(errorResponse));
+				});
 	}
 
 	@Operation(summary = "同步指定别名的笔记仓库", description = "对指定的笔记仓库执行`git pull`操作，从远程拉取最新更改。如果本地仓库不存在，会先尝试`git clone`。")
