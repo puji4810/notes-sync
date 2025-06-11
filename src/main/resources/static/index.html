@@ -61,6 +61,7 @@
                                             <el-dropdown-item command="edit">编辑</el-dropdown-item>
                                             <el-dropdown-item command="clone">克隆</el-dropdown-item>
                                             <el-dropdown-item command="commit">提交并推送</el-dropdown-item>
+                                            <el-dropdown-item command="p2p-broadcast" divided>P2P广播</el-dropdown-item>
                                             <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
                                         </el-dropdown-menu>
                                     </template>
@@ -137,6 +138,48 @@
                             </span>
                         </template>
                     </el-dialog>
+
+                    <!-- P2P广播对话框 -->
+                    <el-dialog v-model="p2pBroadcastDialog" title="P2P广播配置" width="40%">
+                        <div style="margin-bottom: 20px;">
+                            <el-alert 
+                                title="P2P广播功能" 
+                                type="info"
+                                description="将仓库配置广播到P2P网络中的其他节点，让其他节点了解您的仓库更新。"
+                                show-icon
+                                :closable="false">
+                            </el-alert>
+                        </div>
+                        
+                        <el-form :model="p2pBroadcastInfo" label-width="120px">
+                            <el-form-item label="仓库别名">
+                                <el-input v-model="p2pBroadcastInfo.repoAlias" disabled></el-input>
+                            </el-form-item>
+                            <el-form-item label="广播类型">
+                                <el-radio-group v-model="p2pBroadcastInfo.broadcastType">
+                                    <el-radio value="new">新仓库广播</el-radio>
+                                    <el-radio value="update">更新仓库广播</el-radio>
+                                    <el-radio value="remove">删除仓库广播</el-radio>
+                                    <el-radio value="sync-request">同步请求广播</el-radio>
+                                </el-radio-group>
+                            </el-form-item>
+                            <el-form-item 
+                                v-if="p2pBroadcastInfo.broadcastType === 'update'" 
+                                label="原仓库别名">
+                                <el-input 
+                                    v-model="p2pBroadcastInfo.oldRepoAlias" 
+                                    placeholder="如果修改了别名，请输入原别名">
+                                </el-input>
+                            </el-form-item>
+                        </el-form>
+                        
+                        <template #footer>
+                            <span class="dialog-footer">
+                                <el-button @click="p2pBroadcastDialog = false">取消</el-button>
+                                <el-button type="primary" @click="executeBroadcast">广播</el-button>
+                            </span>
+                        </template>
+                    </el-dialog>
                 </el-main>
             </el-container>
         </el-container>
@@ -166,6 +209,8 @@
     <script src="js/element-icons-compat.js"></script>
     <!-- 自定义脚本 -->
     <script src="js/websocket.js"></script>
+    <script src="js/websocket-persistent.js"></script>
+    <script src="js/websocket-monitor.js"></script>
     <script src="js/navigation.js"></script>
     <script src="js/app.js"></script>
 </body>

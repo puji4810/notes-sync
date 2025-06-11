@@ -100,8 +100,13 @@ public class PeerController {
 	}
 
 	@Operation(summary = "移除手动添加的对等节点", description = "从手动添加的对等节点列表中移除指定节点")
-	@DeleteMapping("/{peerAddress}")
-	public ResponseEntity<String> removePeer(@PathVariable String peerAddress) {
+	@DeleteMapping
+	public ResponseEntity<String> removePeer(@RequestBody Map<String, String> request) {
+		String peerAddress = request.get("address");
+		if (peerAddress == null || peerAddress.isBlank()) {
+			return ResponseEntity.badRequest().body("节点地址不能为空");
+		}
+
 		if (manualPeers.remove(peerAddress)) {
 			logger.info("移除了手动添加的对等节点: {}", peerAddress);
 			return ResponseEntity.ok("节点已移除: " + peerAddress);
@@ -126,8 +131,9 @@ public class PeerController {
 		return webSocketHandler.connectToPeer(peerAddress)
 				.thenReturn(ResponseEntity.ok("已成功连接到节点: " + peerAddress))
 				.onErrorResume(e -> {
-					logger.error("连接到节点 {} 失败: {}", peerAddress, e.getMessage());
-					return Mono.just(ResponseEntity.status(500).body("连接失败: " + e.getMessage()));
+					logger.error("连接到节点 {} 失败: {}", peerAddress, e.getMessage(), e);
+					return Mono.just(ResponseEntity.status(500)
+							.body("连接失败: " + e.getClass().getSimpleName() + " - " + e.getMessage()));
 				});
 	}
 
@@ -170,10 +176,20 @@ public class PeerController {
 		private String address;
 		private Date lastSeen;
 		private String status; // "connected", "discovered" 或 "manual"
+		private String name; // 节点名称
 
 		// Getters and setters
 		public String getAddress() {
 			return address;
+		}
+
+		public String getName() {
+			// 如果没有名字，使用地址作为名字
+			return name != null ? name : address;
+		}
+
+		public void setName(String name) {
+			this.name = name;
 		}
 
 		public void setAddress(String address) {

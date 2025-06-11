@@ -259,7 +259,38 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 			return Mono.empty();
 		}
 
-		URI wsUri = URI.create("ws://" + peerAddress + "/p2p");
+		// 处理IPv6地址格式
+		String formattedAddress = formatPeerAddress(peerAddress);
+		logger.debug("Formatted peer address: {}", formattedAddress);
+
+		URI wsUri;
+		try {
+			// 分析地址和端口
+			String host;
+			int port;
+
+			if (formattedAddress.contains("[") && formattedAddress.contains("]:")) {
+				// IPv6 地址格式 [IPv6]:port
+				int closeBracketIndex = formattedAddress.indexOf("]");
+				host = formattedAddress.substring(1, closeBracketIndex); // 去掉方括号
+				port = Integer.parseInt(formattedAddress.substring(closeBracketIndex + 2)); // 跳过"]:"
+			} else if (formattedAddress.contains(":")) {
+				// IPv4地址或主机名:端口
+				String[] parts = formattedAddress.split(":");
+				host = parts[0];
+				port = Integer.parseInt(parts[1]);
+			} else {
+				// 只有主机名，使用默认端口80
+				host = formattedAddress;
+				port = 80;
+			}
+
+			wsUri = new URI("ws", null, host, port, "/p2p", null, null);
+		} catch (Exception e) {
+			logger.error("无法解析地址 {}: {}", formattedAddress, e.getMessage());
+			throw new IllegalArgumentException("无法解析地址: " + formattedAddress, e);
+		}
+
 		logger.info("Attempting to connect to peer at {}", wsUri);
 
 		WebSocketHandler clientConnectionHandler = clientSession -> {
@@ -399,5 +430,57 @@ public class P2PWebSocketHandlerReactive implements WebSocketHandler {
 		} catch (JsonProcessingException e) {
 			logger.error("Failed to serialize message for broadcast", e);
 		}
+	}
+
+	/**
+	 * 格式化对等节点地址，确保IPv6地址的正确表示
+	 * 
+	 * @param address 对等节点地址（可能是IPv4或IPv6）
+	 * @return 格式化后的地址
+	 */
+	private String formatPeerAddress(String address) {
+		if (address == null || address.isEmpty()) {
+			return address;
+		}
+
+		// 检查是否已经格式化为 [IPv6]:port 格式
+		if (address.contains("[") && address.contains("]:")) {
+			return address;
+		}
+
+		// 处理形如 fe80:0:0:0:0:0:0:1:8081 的情况（IPv6+端口）
+		int colonCount = address.length() - address.replace(":", "").length();
+		if (colonCount > 1) {
+			// 看看是不是形如 IPv6:port 的格式
+			try {
+				// 寻找最后一个冒号
+				int lastColonIndex = address.lastIndexOf(":");
+
+				// 尝试将最后一个冒号后的部分解析为端口号
+				String possiblePort = address.substring(lastColonIndex + 1);
+				int port = Integer.parseInt(possiblePort);
+
+				// 如果成功解析为端口号，则前面部分是IPv6地址
+				String ipv6Part = address.substring(0, lastColonIndex);
+
+				// 检查ipv6Part是否是有效的IPv6地址格式
+				if (ipv6Part.split(":").length == 8) {
+					// 有效的IPv6地址，返回[IPv6]:port格式
+					return "[" + ipv6Part + "]:" + port;
+				} else {
+					// 不是有效的IPv6+端口格式，可能整个字符串都是IPv6地址
+					return "[" + address + "]";
+				}
+			} catch (NumberFormatException e) {
+				// 最后一部分不是数字，整个字符串是一个IPv6地址
+				return "[" + address + "]";
+			} catch (Exception e) {
+				// 发生其他异常，保守处理，整个字符串作为地址
+				return "[" + address + "]";
+			}
+		}
+
+		// IPv4或主机名:端口格式，不需要特殊处理
+		return address;
 	}
 }
